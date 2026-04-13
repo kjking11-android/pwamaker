@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PWA Maker</title>
+	<link rel="manifest" href="manifest.json">
+<script>
+if ('serviceWorker' in navigator) {
+	window.addEventListener('load', () => {
+	navigator.serviceWorker.register('sw.js').then(registration => {
+	console.log('ServiceWorker registration successful with scope: ', registration.scope);
+	}, err => {
+	console.log('ServiceWorker registration failed: ', err);
+	}).catch(err => {
+	console.log(err)
+	});
+	});
+}
+</script>
+    
+    
+    
+
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+
+    <!-- JSZip & FileSaver for packaging -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <!-- Import Map for Material Web -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@material/web/": "https://esm.run/@material/web/"
+        }
+    }
+    </script>
+
+    <style>
+        /* * Material 3 Design Tokens - Google Blue (Fixed)
+         */
+        :root {
+            /* Light Mode Tokens */
+            --md-sys-color-primary: #0b57d0;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #d3e3fd;
+            --md-sys-color-on-primary-container: #041e49;
+            --md-sys-color-secondary: #006391;
+            --md-sys-color-on-secondary: #ffffff;
+            --md-sys-color-secondary-container: #c2e7ff;
+            --md-sys-color-on-secondary-container: #001d35;
+            --md-sys-color-tertiary: #0b57d0;
+            --md-sys-color-on-tertiary: #ffffff;
+            --md-sys-color-background: #f8f9fa;
+            --md-sys-color-on-background: #1f1f1f;
+            --md-sys-color-surface: #f8f9fa;
+            --md-sys-color-on-surface: #1f1f1f;
+            --md-sys-color-surface-variant: #e1e3e1;
+            --md-sys-color-on-surface-variant: #444746;
+            --md-sys-color-outline: #747775;
+            --md-sys-color-outline-variant: #c4c7c5;
+            --md-sys-color-error: #b3261e;
+            --md-sys-color-on-error: #ffffff;
+            
+            /* Typography */
+            --md-ref-typeface-brand: 'Google Sans', sans-serif;
+            --md-ref-typeface-plain: 'Roboto', sans-serif;
+
+            --transition-duration: 0.3s;
+        }
+
+        /* Dark Mode Override */
+        [data-theme="dark"] {
+            --md-sys-color-primary: #a8c7fa;
+            --md-sys-color-on-primary: #062e6f;
+            --md-sys-color-primary-container: #0842a0;
+            --md-sys-color-on-primary-container: #d3e3fd;
+            --md-sys-color-secondary: #7fcfff;
+            --md-sys-color-on-secondary: #00334d;
+            --md-sys-color-secondary-container: #004a6e;
+            --md-sys-color-on-secondary-container: #c2e7ff;
+            --md-sys-color-background: #1b1b1b;
+            --md-sys-color-on-background: #e3e3e3;
+            --md-sys-color-surface: #1b1b1b;
+            --md-sys-color-on-surface: #e3e3e3;
+            --md-sys-color-surface-variant: #444746;
+            --md-sys-color-on-surface-variant: #c4c7c5;
+            --md-sys-color-outline: #8e918f;
+            --md-sys-color-outline-variant: #444746;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--md-ref-typeface-plain);
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            transition: background-color var(--transition-duration), color var(--transition-duration), margin-left 0.3s;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Layout */
+        header {
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        header h1 {
+            margin: 0;
+            font-family: var(--md-ref-typeface-brand);
+            font-size: 22px;
+            font-weight: 400;
+        }
+
+        main {
+            flex: 1;
+            padding: 16px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+            padding-bottom: 120px;
+            transition: padding-bottom 0.3s;
+        }
+
+        /* View Management */
+        .view-section {
+            display: none;
+            animation: fadeScale 0.25s cubic-bezier(0.2, 0, 0, 1) forwards;
+        }
+        .view-section.active {
+            display: block;
+        }
+
+        @keyframes fadeScale {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-card {
+            background-color: var(--md-sys-color-surface);
+            border-radius: 28px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .section-title {
+            font-family: var(--md-ref-typeface-brand);
+            font-size: 1.5rem;
+            font-weight: 400;
+            margin-bottom: 20px;
+            color: var(--md-sys-color-primary);
+        }
+
+        h3.sub-title {
+            font-family: var(--md-ref-typeface-plain);
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--md-sys-color-on-surface-variant);
+            margin: 24px 0 12px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .flex-row-wrap {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* Hero Display for Google Blue */
+        .hero-banner {
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            border-radius: 28px;
+            padding: 32px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .hero-banner h2 {
+            font-family: var(--md-ref-typeface-brand);
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        /* Floating Action Button */
+        .fab-container {
+            position: fixed;
+            bottom: 100px;
+            right: 24px;
+            z-index: 6;
+            transition: all 0.3s;
+        }
+
+        /* Custom Navigation */
+        .custom-nav {
+            position: fixed;
+            background-color: var(--md-sys-color-surface);
+            display: flex;
+            align-items: center;
+            z-index: 100;
+            transition: all 0.3s ease;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            justify-content: space-evenly;
+            padding-bottom: env(safe-area-inset-bottom);
+            box-shadow: 0 -1px 3px 0 rgba(0,0,0,0.1);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            height: 100%;
+            cursor: pointer;
+            color: var(--md-sys-color-on-surface-variant);
+            user-select: none;
+        }
+
+        .nav-icon-container {
+            width: 64px;
+            height: 32px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 16px;
+            margin-bottom: 4px;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .nav-item .material-symbols-outlined {
+            font-size: 24px;
+            font-variation-settings: 'FILL' 0;
+        }
+
+        .nav-label {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .nav-item.active .nav-icon-container {
+            background-color: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }
+
+        @media (min-width: 600px) {
+            body { margin-left: 80px; }
+            main { padding-bottom: 32px; }
+            .custom-nav {
+                top: 0; bottom: 0; left: 0; right: auto;
+                width: 80px; height: 100%; flex-direction: column;
+                justify-content: flex-start; padding-top: 32px;
+            }
+            .nav-item { flex: none; height: 72px; width: 100%; margin-bottom: 12px; }
+            .fab-container { bottom: 32px; right: 32px; }
+        }
+
+        /* M3 Cards Custom */
+        .m3-card {
+            border-radius: 12px;
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            margin-bottom: 16px;
+            overflow: hidden;
+            border: 1px solid var(--md-sys-color-outline-variant);
+            transition: box-shadow 0.2s;
+            position: relative;
+        }
+        .m3-card.elevated {
+            border: none;
+            background-color: var(--md-sys-color-surface-variant);
+            box-shadow: 0px 1px 3px 1px rgba(0,0,0,0.15);
+        }
+        .m3-card-content { padding: 16px; }
+
+        /* Dark Mode for Dialog explicitly */
+        md-dialog {
+            --md-dialog-container-color: var(--md-sys-color-surface);
+        }
+
+        .custom-file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <md-icon-button><span class="material-symbols-outlined">api</span></md-icon-button>
+            <h1>PWA Maker</h1>
+        </div>
+        <div style="display:flex; align-items:center;">
+            <md-icon-button onclick="window.toggleDarkMode()">
+                <span class="material-symbols-outlined" id="theme-icon">dark_mode</span>
+            </md-icon-button>
+            <md-icon-button id="usage-anchor">
+                <span class="material-symbols-outlined">more_vert</span>
+            </md-icon-button>
+            <md-menu anchor="usage-anchor" id="usage-menu">
+                <md-menu-item onclick="window.showInfo()">
+                    <div slot="headline">About PWA Maker</div>
+                </md-menu-item>
+            </md-menu>
+        </div>
+    </header>
+
+    <main>
+        <!-- HOME VIEW -->
+        <section id="view-home" class="view-section active">
+            <div class="hero-banner">
+                <h2>Create PWA instantly</h2>
+                <p>Convert your single HTML file (with integrated CSS/JS) into a fully functional Progressive Web App in seconds.</p>
+                <div class="flex-row-wrap">
+                    <md-filled-button onclick="window.switchTab('generator')">Start Generating</md-filled-button>
+                    <md-outlined-button onclick="window.showInfo()">Learn More</md-outlined-button>
+                </div>
+            </div>
+
+            <div class="m3-card elevated">
+                <md-ripple></md-ripple>
+                <div class="m3-card-content">
+                    <h3 style="margin: 0 0 8px 0; font-family: var(--md-ref-typeface-brand); color: var(--md-sys-color-primary);">How it works</h3>
+                    <p style="margin: 0; color: var(--md-sys-color-on-surface-variant); line-height: 1.5;">
+                        1. Provide the necessary details for your app.<br>
+                        2. Upload your existing single HTML file.<br>
+                        3. Upload a square icon image.<br>
+                        4. Download the generated ZIP package containing your modified HTML, manifest, service worker, and resized icons.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- GENERATOR VIEW -->
+        <section id="view-generator" class="view-section">
+            <div class="section-card">
+                <div class="section-title">App Details</div>
+                <div style="display:flex; flex-direction:column; gap:20px;">
+                    <md-outlined-text-field id="input-app-name" label="App Name" placeholder="e.g. Visitoroid" required>
+                        <md-icon slot="leading-icon"><span class="material-symbols-outlined">badge</span></md-icon>
+                    </md-outlined-text-field>
+
+                    <md-outlined-text-field id="input-cache-name" label="Cache Name" placeholder="e.g. Visitoroid-caches" required>
+                        <md-icon slot="leading-icon"><span class="material-symbols-outlined">memory</span></md-icon>
+                    </md-outlined-text-field>
+
+                    <md-outlined-text-field id="input-repo-path" label="Repository Path (urlsToCache)" placeholder="e.g. /visitoroid/" supporting-text="Specify the repository name (e.g. for GitHub Pages). Must include formatting like /visitoroid/" required>
+                        <md-icon slot="leading-icon"><span class="material-symbols-outlined">folder</span></md-icon>
+                    </md-outlined-text-field>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">Assets</div>
+                
+                <h3 class="sub-title">Source HTML</h3>
+                <div style="display:flex; align-items:center; gap: 16px;">
+                    <input type="file" id="html-input" class="custom-file-input" accept=".html">
+                    <md-outlined-button onclick="document.getElementById('html-input').click()">
+                        <md-icon slot="icon"><span class="material-symbols-outlined">html</span></md-icon>
+                        Select HTML
+                    </md-outlined-button>
+                    <span id="html-file-name" style="color: var(--md-sys-color-on-surface-variant); font-size: 0.875rem;">No file selected</span>
+                </div>
+
+                <h3 class="sub-title" style="margin-top:32px;">App Icon</h3>
+                <div style="display:flex; align-items:center; gap: 16px;">
+                    <input type="file" id="icon-input" class="custom-file-input" accept="image/*">
+                    <md-outlined-button onclick="document.getElementById('icon-input').click()">
+                        <md-icon slot="icon"><span class="material-symbols-outlined">image</span></md-icon>
+                        Select Icon
+                    </md-outlined-button>
+                    <span id="icon-file-name" style="color: var(--md-sys-color-on-surface-variant); font-size: 0.875rem;">No file selected</span>
+                </div>
+                <p style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;">Upload a square image. It will be resized to 192x192 and 512x512 automatically.</p>
+            </div>
+            
+            <div style="display:flex; justify-content:center; margin-top: 24px; padding-bottom: 24px;">
+                <md-filled-button onclick="window.generatePWA()" style="width: 100%; max-width: 300px; --md-filled-button-container-height: 56px;">
+                    <md-icon slot="icon"><span class="material-symbols-outlined">package</span></md-icon>
+                    Generate ZIP Package
+                </md-filled-button>
+            </div>
+        </section>
+
+        <!-- ABOUT VIEW -->
+        <section id="view-about" class="view-section">
+            <div class="section-card">
+                <div class="section-title">About Service Worker</div>
+                <p style="color: var(--md-sys-color-on-surface); line-height: 1.6;">
+                    The generated package includes a <code>sw.js</code> file to cache your app for offline use.
+                </p>
+                <h3 class="sub-title">urlsToCache Information</h3>
+                <p style="color: var(--md-sys-color-on-surface); line-height: 1.6; font-size: 0.9rem;">
+                    When hosting on subdirectories (like GitHub Pages), it's crucial to set the exact repository path. 
+                    <br><br>
+                    <strong>Example:</strong> If your URL is <code>https://username.github.io/visitoroid/</code>, 
+                    set the Repository Path to <code>/visitoroid/</code>.
+                </p>
+                <md-divider style="margin: 24px 0;"></md-divider>
+                <div style="display:flex; align-items:center; gap: 8px; color: var(--md-sys-color-primary);">
+                    <span class="material-symbols-outlined">privacy_tip</span>
+                    <span style="font-weight: 500;">Privacy Note</span>
+                </div>
+                <p style="color: var(--md-sys-color-on-surface-variant); font-size: 0.875rem; margin-top: 8px;">
+                    Everything runs locally in your browser. No files are uploaded to any server during the generation process.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- FAB -->
+    <div class="fab-container">
+        <md-fab variant="primary" label="Generate" onclick="window.generatePWA()">
+            <md-icon slot="icon"><span class="material-symbols-outlined">build</span></md-icon>
+        </md-fab>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="custom-nav">
+        <div class="nav-item active" id="nav-home" onclick="window.switchTab('home')">
+            <div class="nav-icon-container"><span class="material-symbols-outlined">home</span></div>
+            <span class="nav-label">Home</span>
+        </div>
+        <div class="nav-item" id="nav-generator" onclick="window.switchTab('generator')">
+            <div class="nav-icon-container"><span class="material-symbols-outlined">manufacturing</span></div>
+            <span class="nav-label">Generator</span>
+        </div>
+        <div class="nav-item" id="nav-about" onclick="window.switchTab('about')">
+            <div class="nav-icon-container"><span class="material-symbols-outlined">info</span></div>
+            <span class="nav-label">About</span>
+        </div>
+    </nav>
+
+    <!-- Reusable Message Dialog -->
+    <md-dialog id="message-dialog">
+        <div slot="headline" id="dialog-title"></div>
+        <div slot="content">
+            <p id="dialog-content" style="margin:0;"></p>
+        </div>
+        <div slot="actions">
+            <md-text-button onclick="document.getElementById('message-dialog').close()">OK</md-text-button>
+        </div>
+    </md-dialog>
+
+    <script type="module">
+        import '@material/web/all.js';
+
+        // --- Theme Management ---
+        let isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        window.toggleDarkMode = function() {
+            isDarkMode = !isDarkMode;
+            document.body.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+            
+            const icon = document.getElementById('theme-icon');
+            if(icon) icon.textContent = isDarkMode ? 'light_mode' : 'dark_mode';
+        };
+
+        if(isDarkMode) document.body.setAttribute('data-theme', 'dark');
+
+        // --- Navigation Logic ---
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            const targetView = document.getElementById('view-' + tabId);
+            if(targetView) targetView.classList.add('active');
+
+            const targetNav = document.getElementById('nav-' + tabId);
+            if(targetNav) targetNav.classList.add('active');
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        // --- Dialogs & Menus ---
+        window.showDialog = function(title, content) {
+            document.getElementById('dialog-title').textContent = title;
+            document.getElementById('dialog-content').innerHTML = content;
+            document.getElementById('message-dialog').show();
+        };
+
+        window.showInfo = function() {
+            window.showDialog('About PWA Maker', 'This tool allows you to convert any single HTML file into a Progressive Web App locally in your browser. Based on Material 3 Design.');
+        };
+
+        const menu = document.getElementById('usage-menu');
+        const anchor = document.getElementById('usage-anchor');
+        anchor.addEventListener('click', () => {
+            menu.open = !menu.open;
+        });
+
+        // --- File Inputs Logic ---
+        document.getElementById('html-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            document.getElementById('html-file-name').textContent = file ? file.name : "No file selected";
+        });
+
+        document.getElementById('icon-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            document.getElementById('icon-file-name').textContent = file ? file.name : "No file selected";
+        });
+
+        // --- PWA Generation Logic ---
+        window.generatePWA = async function() {
+            const appName = document.getElementById('input-app-name').value.trim();
+            const cacheName = document.getElementById('input-cache-name').value.trim();
+            const repoPath = document.getElementById('input-repo-path').value.trim();
+            const htmlFile = document.getElementById('html-input').files[0];
+            const iconFile = document.getElementById('icon-input').files[0];
+
+            // Validation
+            if (!appName || !cacheName || !repoPath) {
+                window.showDialog('Missing Information', 'Please fill in App Name, Cache Name, and Repository Path.');
+                return;
+            }
+            if (!htmlFile) {
+                window.showDialog('Missing Asset', 'Please select a source HTML file.');
+                return;
+            }
+            if (!iconFile) {
+                window.showDialog('Missing Asset', 'Please select an Icon image.');
+                return;
+            }
+
+            try {
+                // 1. Read HTML
+                let htmlContent = await htmlFile.text();
+
+                // 2. Extract original title
+                const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
+                const originalTitle = titleMatch ? titleMatch[1] : appName;
+
+                // 3. Remove existing meta charset, viewport, and title to prevent duplicates when replacing
+                let cleanedHtml = htmlContent
+                    .replace(/<meta\s+charset=[^>]+>/i, '')
+                    .replace(/<meta\s+name=["']viewport["'][^>]+>/i, '')
+                    .replace(/<title>.*?<\/title>/i, '');
+
+                // 4. Create the exact block to replace/inject
+                // Notice the exact spacing and newlines as requested
+                const pwaHeadBlock = `    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>${originalTitle}</title>
+\t<link rel="manifest" href="manifest.json">
+<script>
+if ('serviceWorker' in navigator) {
+\twindow.addEventListener('load', () => {
+\tnavigator.serviceWorker.register('sw.js').then(registration => {
+\tconsole.log('ServiceWorker registration successful with scope: ', registration.scope);
+\t}, err => {
+\tconsole.log('ServiceWorker registration failed: ', err);
+\t}).catch(err => {
+\tconsole.log(err)
+\t});
+\t});
+}
+<\/script>`;
+
+                // 5. Inject the block accurately into the <head> section
+                if (cleanedHtml.includes('<head>')) {
+                    cleanedHtml = cleanedHtml.replace('<head>', '<head>\n' + pwaHeadBlock);
+                } else if (cleanedHtml.includes('<html>')) {
+                    cleanedHtml = cleanedHtml.replace('<html>', '<html>\n<head>\n' + pwaHeadBlock + '\n</head>');
+                } else {
+                    cleanedHtml = '<head>\n' + pwaHeadBlock + '\n</head>\n' + cleanedHtml;
+                }
+                htmlContent = cleanedHtml;
+
+                // 6. Generate manifest.json exactly as requested
+                const manifestContent = JSON.stringify({
+                    "short_name": appName,
+                    "name": appName,
+                    "display": "standalone",
+                    "start_url": "index.html",
+                    "icons": [
+                        {
+                            "src": "images/icon-192.png",
+                            "sizes": "192x192",
+                            "type": "image/png"
+                        },
+                        {
+                            "src": "images/icon-512.png",
+                            "sizes": "512x512",
+                            "type": "image/png"
+                        }
+                    ]
+                }, null, '\t');
+
+                // 7. Generate sw.js exactly as requested
+                const swContent = `var CACHE_NAME = '${cacheName}';
+var urlsToCache = [
+\t'${repoPath}',
+];
+
+self.addEventListener('install', function(event) {
+\tevent.waitUntil(
+\t\tcaches
+\t\t\t.open(CACHE_NAME)
+\t\t\t.then(function(cache) {
+\t\t\t\treturn cache.addAll(urlsToCache);
+\t\t\t})
+\t);
+});
+
+self.addEventListener('fetch', function(event) {
+\tevent.respondWith(
+\t\tcaches
+\t\t\t.match(event.request)
+\t\t\t.then(function(response) {
+\t\t\t\treturn response ? response : fetch(event.request);
+\t\t\t})
+\t);
+});`;
+
+                // 8. Resize Image for Icons
+                const blob192 = await resizeImage(iconFile, 192);
+                const blob512 = await resizeImage(iconFile, 512);
+
+                // 9. Create ZIP archive
+                const zip = new JSZip();
+                zip.file("index.html", htmlContent);
+                zip.file("manifest.json", manifestContent);
+                zip.file("sw.js", swContent);
+                
+                const imgFolder = zip.folder("images");
+                imgFolder.file("icon-192.png", blob192);
+                imgFolder.file("icon-512.png", blob512);
+
+                const zipBlob = await zip.generateAsync({type:"blob"});
+                
+                // Trigger Download
+                const safeName = appName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                saveAs(zipBlob, `${safeName}_pwa_package.zip`);
+
+                window.showDialog('Success', 'PWA Package generated successfully! Extract the ZIP and upload it to your server.');
+
+            } catch (error) {
+                console.error(error);
+                window.showDialog('Error', 'Failed to generate package. See console for details.');
+            }
+        };
+
+        // Utility to resize image using Canvas API
+        function resizeImage(file, size) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size;
+                        canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, size, size);
+                        canvas.toBlob((blob) => {
+                            resolve(blob);
+                        }, 'image/png');
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>
